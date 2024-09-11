@@ -1,11 +1,13 @@
-# app/routes.py
 from datetime import datetime
-
 from flask import Blueprint, request, jsonify, abort
 from .models import Weather
 from . import db
+import requests
+import os
+from sqlalchemy.exc import IntegrityError
 
 bp = Blueprint('main', __name__)
+
 
 @bp.route('/weather', methods=['POST'])
 def add_weather():
@@ -33,9 +35,16 @@ def add_weather():
         humidity=humidity,
         wind_speed=wind_speed
     )
-    db.session.add(new_weather)
-    db.session.commit()
+
+    try:
+        db.session.add(new_weather)
+        db.session.commit()
+    except IntegrityError:
+        db.session.rollback()  # Откат транзакции в случае ошибки
+        abort(400, description="Weather data for this city and date already exists.")
+
     return jsonify({'id': new_weather.id}), 201
+
 
 @bp.route('/weather/<int:id>', methods=['PUT'])
 def update_weather(id):
@@ -52,12 +61,14 @@ def update_weather(id):
     db.session.commit()
     return jsonify({'id': weather.id})
 
+
 @bp.route('/weather/<int:id>', methods=['DELETE'])
 def delete_weather(id):
     weather = Weather.query.get_or_404(id)
     db.session.delete(weather)
     db.session.commit()
     return '', 204
+
 
 @bp.route('/weather/<int:id>', methods=['GET'])
 def get_weather(id):
@@ -71,3 +82,44 @@ def get_weather(id):
         'humidity': weather.humidity,
         'wind_speed': weather.wind_speed
     })
+
+
+@bp.route('/weather/fetch/<string:city>', methods=['POST'])
+def fetch_weather(city):
+    api_key = os.getenv('WEATHER_API_KEY')
+    if not api_key:
+        abort(500, description='API key not found in environment variables')
+
+    url = f'http://api.openweathermap.org/data/2.5/weather?q={city}&appid={api_key}&units=metric'
+
+    response = requests.get(url)
+    if response.status_code != 200:
+        abort(response.status_code, description='Failed to fetch weather data from external API')
+
+    data = response.json()
+    weather_data = {
+        'city': city,
+        'date': datetime.now().strftime('%Y-%m-%d'),
+        'temperature': data['main']['temp'],
+        'description': data['weather'][0]['description'],
+        'humidity': data['main']['humidity'],
+        'wind_speed': data['wind']['speed']
+    }
+
+    new_weather = Weather(
+        city=weather_data['city'],
+        date=datetime.strptime(weather_data['date'], '%Y-%m-%d').date(),
+        temperature=weather_data['temperature'],
+        description=weather_data['description'],
+        humidity=weather_data['humidity'],
+        wind_speed=weather_data['wind_speed']
+    )
+
+    try:
+        db.session.add(new_weather)
+        db.session.commit()
+    except IntegrityError:
+        db.session.rollback()  # Откат транзакции в случае ошибки
+        return jsonify({'error': 'Weather data for this city and date already exists.'}), 400
+
+    return jsonify({'id': new_weather.id}), 201

@@ -3,7 +3,7 @@ from datetime import datetime
 
 class Weather(db.Model):
     id = db.Column(db.Integer, primary_key=True)
-    city = db.Column(db.String(100), nullable=False)
+    city = db.Column(db.String(100), nullable=False)  # Используем строку для города
     date = db.Column(db.Date, nullable=False)
     temperature = db.Column(db.Float, nullable=False)
     description = db.Column(db.String(255), nullable=True)
