@@ -1,5 +1,4 @@
 from . import db
-from datetime import datetime
 
 class Weather(db.Model):
     id = db.Column(db.Integer, primary_key=True)
