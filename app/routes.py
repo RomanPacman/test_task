@@ -40,7 +40,7 @@ def add_weather():
         db.session.add(new_weather)
         db.session.commit()
     except IntegrityError:
-        db.session.rollback()  # Откат транзакции в случае ошибки
+        db.session.rollback()
         abort(400, description="Weather data for this city and date already exists.")
 
     return jsonify({'id': new_weather.id}), 201
@@ -119,7 +119,7 @@ def fetch_weather(city):
         db.session.add(new_weather)
         db.session.commit()
     except IntegrityError:
-        db.session.rollback()  # Откат транзакции в случае ошибки
+        db.session.rollback()
         return jsonify({'error': 'Weather data for this city and date already exists.'}), 400
 
     return jsonify({'id': new_weather.id}), 201
